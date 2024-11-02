@@ -1,65 +1,72 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<sys/socket.h>
-#include<sys/types.h>
-#include<string.h>
-#include<netinet/in.h>
-#include<errno.h>
-#include<time.h>
-int main(int argc,char *argv[]) {
-int n,s,t;
-struct sockaddr_in servaddr,local,rem;
-char buffer[1024];
-if(argc<3)
-{
-printf("usage:client<server-addr><port>");
-Program No.14 Concurrent Time Server
-Aim:-
-To Implement a Concurrent time server using UDP as transport layer protocol by executing the program at remote server. Client sends a time request to Server and Server sends its system time back to the client. Client displays the result.
-exit(0);
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <string.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <arpa/inet.h>
+#include <unistd.h> // for close()
+
+int main(int argc, char *argv[]) {
+    int n, s, t;
+    struct sockaddr_in servaddr, local;
+    char buffer[1024];
+
+    if (argc < 3) {
+        printf("Usage: client <server-addr> <port>\n");
+        exit(0);
+    }
+
+    // Create socket
+    if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("Error in socket creation");
+        exit(1);
+    }
+
+    // Set up local address
+    bzero((char *)&local, sizeof(local));
+    local.sin_family = AF_INET;
+    local.sin_port = htons(6677); // Change this if needed
+    local.sin_addr.s_addr = htonl(INADDR_ANY); // Use any available interface
+
+    // Bind the socket
+    if (bind(s, (struct sockaddr *)&local, sizeof(local)) == -1) {
+        perror("Bind error");
+        close(s);
+        exit(1);
+    }
+
+    // Set up server address
+    bzero((char *)&servaddr, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons((short)atoi(argv[2]));
+    servaddr.sin_addr.s_addr = inet_addr(argv[1]);
+
+    // Send "TIME" message to server
+    strcpy(buffer, "TIME");
+    if (sendto(s, buffer, sizeof(buffer), 0, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+        perror("Error in sendto");
+        close(s);
+        exit(1);
+    }
+
+    t = sizeof(servaddr);
+    printf("The current time is: ");
+    if ((n = recvfrom(s, buffer, sizeof(buffer) - 1, 0, (struct sockaddr *)&servaddr, &t)) > 0) {
+        buffer[n] = '\0';
+        fputs(buffer, stdout);
+    } else {
+        if (n < 0) {
+            perror("Error in read from");
+        } else {
+            printf("Server closed connection\n");
+        }
+        close(s);
+        exit(1);
+    }
+
+    // Close the socket
+    close(s);
+    return 0;
 }
-if((s=socket(AF_INET,SOCK_DGRAM,0))<0)
-{
-perror("error in socket creation");
-exit(0);
-}
-bzero((char *)&local,sizeof(local));
-local.sin_family=AF_INET;
-local.sin_port=htons(6677);
-local.sin_addr.s_addr=inet_addr(argv[1]);
-if(bind(s,(struct sockaddr *)&local,sizeof(local))==-1)
-{
-perror("bind error");
-exit(1);
-}
-bzero((char *)&servaddr,sizeof(local));
-servaddr.sin_family=AF_INET;
-servaddr.sin_port=htons((short)atoi(argv[2]));
-servaddr.sin_addr.s_addr=inet_addr(argv[1]);
-strcpy(buffer,"TIME");
-if(sendto(s,buffer,sizeof(buffer),0,(struct sockaddr*)&servaddr,sizeof(servaddr))<0)
-{
-perror("error in sendto");
-exit(0);
-}
-t=sizeof(servaddr);
-printf("the current time is:");
-if((n=recvfrom(s,buffer,1024,0,(struct sockaddr *)&servaddr,&t))>0)
-{
-buffer[n]='\0';
-fputs(buffer,stdout);
-}
-else
-{
-if(n<0)
-{
-perror("error in read from");
-exit(0);
-}
-else
-printf("server closed connection\n");
-exit(1);
-}
-memset(buffer,0,100);
-close(s);
-return 0;
